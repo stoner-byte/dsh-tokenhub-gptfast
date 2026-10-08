@@ -1,7 +1,7 @@
 {
-  "name": "dsh-tokenhub-fast",
-  "version": "0.1.0",
-  "description": "Loopback injector that enables the TokenHub fast (priority) service tier for DSH.",
+  "name": "dsh-tokenhub-gptfast",
+  "version": "0.2.0",
+  "description": "Loopback injector that requests the GPT fast service tier through a configurable relay for DSH.",
   "type": "module",
   "main": "lib/index.js",
   "exports": {

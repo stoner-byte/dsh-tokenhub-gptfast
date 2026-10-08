@@ -1,9 +1,10 @@
-# Installs the loopback proxy that adds the TokenHub `fast` (priority) service tier.
+# Installs the loopback proxy that requests the `fast` (priority) service tier
+# for whitelisted models via a configurable relay API baseURL.
 #
-# The row carries no config on purpose: `enabled` and `models` live in the plugin's
-# Config schema, so DSH renders them as a form and writes changes through the
-# settings service. Edit them in DSH (Plugins -> dsh-tokenhub-fast -> Configure),
+# The row carries no config on purpose: settings live in the plugin's Config
+# schema, so DSH renders them as a form and writes changes through the settings
+# service. Edit them in DSH (Plugins -> dsh-tokenhub-gptfast -> Configure),
 # not in this file.
 - insert:
-    - id: tokenhub-fast-proxy
-      name: dsh-tokenhub-fast
+    - id: dsh-tokenhub-gptfast
+      name: dsh-tokenhub-gptfast
