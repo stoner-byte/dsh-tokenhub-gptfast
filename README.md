@@ -17,7 +17,7 @@ DSH (pi-ai 路由)  ->  127.0.0.1:8788  ->  你配置的中转站 API baseURL
 ## 安装
 
 ```bash
-dsh plugin --profile <你的 profile> add /Users/stoner/code/dsh-tokenhub-fast
+dsh plugin --profile <你的 profile> add /Users/stoner/code/dsh-tokenhub-gptfast
 ```
 
 也可以在 GUI 的插件页安装本地包。安装结果若为 `applied`，无需重启；若为 `restart-required`，按提示重启 DSH。
