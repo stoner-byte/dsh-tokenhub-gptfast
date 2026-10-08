@@ -1,92 +1,21 @@
 # dsh-tokenhub-gptfast
 
-让 DSH 通过中转站访问 GPT 模型时，可以按模型白名单请求 `service_tier: "fast"` 或 `"priority"`。插件在 DSH 宿主进程内起一个回环代理，只修改请求体里的一个字段，其余请求原样转发。
-
-不改中转站源码，不改 DSH 源码，只用公开的插件接口。
-
-## 原理
-
-中转站通常只从**请求体**读取 `service_tier`，没有 header 开关，pi-ai 路由配置也没有"往请求体加字段"的口子。所以插件在 DSH 内起一个回环代理：
-
-```
-DSH (pi-ai 路由)  ->  127.0.0.1:8788  ->  你配置的中转站 API baseURL
-```
-
-代理只对命中条件的生成请求补一个字段，其余请求字节级透传。
+DSH 插件。它会在本机运行一个 API 代理，并按模型白名单为生成请求添加 `service_tier`（`fast` 或 `priority`），再转发到你配置的 API 上游。
 
 ## 安装
 
 ```bash
-dsh plugin --profile <你的 profile> add /Users/stoner/code/dsh-tokenhub-gptfast
+git clone https://github.com/stoner-byte/dsh-tokenhub-gptfast.git
+cd dsh-tokenhub-gptfast
+dsh plugin --profile <profile> add .
 ```
 
-也可以在 GUI 的插件页安装本地包。安装结果若为 `applied`，无需重启；若为 `restart-required`，按提示重启 DSH。
+也可以从 DSH 的插件页面安装此项目。
 
-**注意**：包名、实例 ID 和浏览器模块 ID 都是 `dsh-tokenhub-gptfast`。旧版 `dsh-tokenhub-fast` 未正式发布，没有配置迁移；请重新安装新版，不要同时运行新旧两个版本，否则 8788 会冲突。
+## 使用
 
-## 配置
+1. 在 DSH 插件页面打开 **dsh-tokenhub-gptfast** 的配置，填写上游 API base URL，并设置模型白名单和档位，然后保存。
+2. 将 DSH 中对应提供商的 API 地址设置为 `http://127.0.0.1:8788/v1`。
+3. 在插件配置中启用插件。
 
-顺序不要颠倒：
-
-1. **先在新版插件页填写中转站 API baseURL。** 打开 **插件**（左侧边栏）→ **dsh-tokenhub-gptfast** → 行 `dsh-tokenhub-gptfast` 的 **配置**：
-
-| 配置项 | 默认 | 含义 |
-|---|---|---|
-| `enabled` | 关闭 | 总开关，打开后才注入档位 |
-| `upstreamBaseURL` | 空 | 中转站 API 根路径，例如 `https://relay.example/v1` |
-| `tier` | `fast` | 请求档位，可选 `priority` |
-| `models` | `gpt-6-sol`、`gpt-6.1-sol` | 只有这些模型注入 `service_tier`，一行一个 |
-
-API baseURL 必须填写**根路径**，不要写完整生成接口地址（如 `/v1/responses` 或 `/v1/chat/completions`）；路径前缀会保留，末尾斜杠兼容。点击 **保存** 后地址、档位和白名单才会生效；开关单独即时提交。
-
-2. **再把原提供商的 API 地址改成本机代理。** 打开 **设置 → 模型**，编辑你要使用的提供商，在 **自定义设置** 里把 `API 地址` 改成 `http://127.0.0.1:8788/v1`。
-
-改动立即生效，不用重启。写入落在 profile 补丁的该插件行（`config:`），重启后仍生效；点 **恢复默认** 会移除开关、白名单和档位的覆盖，**保留已保存的 API 地址**。
-
-开关只在**插件页**出现：**设置 → 内置插件** 是只读清单，那里看不到可编辑项。
-
-### 认证与目标安全
-
-API Key 仍由 DSH 的提供商配置管理，插件只透传 `authorization` 头，不读取、不记录、不另存。你填写的 `upstreamBaseURL` 就是认证头的接收方，请确认信任该目标。
-
-插件会拒绝以下地址：非 HTTP(S) 协议、内嵌用户名/密码、带查询参数或片段、完整生成接口 URL、远程 HTTP，以及指向代理自身 `127.0.0.1:8788` 的回环地址。
-
-## 接口范围
-
-插件只识别这两个生成接口的 POST 请求：
-
-- `/v1/responses`
-- `/v1/chat/completions`
-
-命中且模型在白名单内、请求体是 JSON 对象、没有显式 `service_tier` 时，才会注入所选档位。其它接口（如 `GET /v1/models`）、子路径、非 POST 请求、白名单外模型、非 JSON 请求体一律透传，不注入字段。
-
-## 计费与档位说明
-
-插件只负责在请求体里加字段，**不保证上游实际采用的档位、加速倍数或对你的收费规则**。中转站可能接受 `fast` 或 `priority`，也可能回显 `default`；具体计费和速度由中转站及其上游决定，请自行参考对应文档。
-
-## 回滚
-
-顺序不能颠倒：
-
-1. 先在 **设置 → 模型** 里把相关提供商的 `API 地址` 改回中转站原地址，恢复直连。
-2. 再卸载插件：`dsh plugin --profile <你的 profile> remove dsh-tokenhub-gptfast`。
-
-反过来做（先卸载）会让路由停在一个没人监听的端口上，该路由下所有模型都会失败。
-
-只想临时停用、不改 baseURL 时，把开关关掉即可。
-
-## 已知限制
-
-- 代理是这条路由**所有**模型的单点。它和 DSH 同进程，DSH 退出就释放，不会留下孤儿进程。
-- 端口固定 `8788`。被占用时插件只警告、不阻断 DSH 启动；这不保证指向该端口的提供商路由可用。不要向来源不明的端口监听者发送请求。
-- 每个 profile 只支持配置**一个**中转站。需要多个中转站请开多个 profile 或分别启用/停用。
-- 开关是 volatile 配置，写入由 Loader 原地提交，**不会**重挂插件，8788 不会因切换而断开。
-- 只监听回环地址，只转发 `/v1/` 开头的路径，凭据只透传、不读取也不落盘。
-
-## 开发
-
-```bash
-npm test
-```
-
-用 `node --test` 跑注入判定和代理转发的测试。测试用本地 stub 当上游，不消耗真实额度。
+默认档位为 `fast`，默认模型白名单为 `gpt-6-sol` 和 `gpt-6.1-sol`。插件只为白名单内、符合条件的生成请求添加档位；其它请求正常转发。实际档位和计费由上游服务决定。
